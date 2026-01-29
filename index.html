@@ -261,45 +261,56 @@ function calcularDesgloseSemanal(mesesCiclo, volTotal, sumaIdealTotal) {
     exportDataSemanal = [];
     const labelsSemana = [];
     const dataSemana = [];
-    let sumaVerificacionSemanal = 0; // Para el total
+    let sumaVerificacionSemanal = 0;
 
     mesesCiclo.forEach(m => {
-        const m3MesAjustado = sumaIdealTotal > 0 ? (m.m3Ideal / sumaIdealTotal) * volTotal : 0;
-        const numSemanas = m.dias / 7;
-        const m3PorSemana = m3MesAjustado / numSemanas;
+        // 1. Total exacto que tiene este mes según el prorrateo de recursos
+        const m3MesObjetivo = sumaIdealTotal > 0 ? (m.m3Ideal / sumaIdealTotal) * volTotal : 0;
+        
+        const numSemanasCompletas = Math.floor(m.dias / 7); // Semanas de 7 días
+        const m3PorSemanaNormal = m3MesObjetivo / (m.dias / 7);
+        
+        let m3AcumuladoEnMes = 0;
 
-        for(let i = 1; i <= Math.ceil(numSemanas); i++) {
-            const m3Final = Math.round(m3PorSemana);
-            sumaVerificacionSemanal += m3Final;
-            
+        // Dibujamos las semanas
+        const iteraciones = Math.ceil(m.dias / 7);
+        for(let i = 1; i <= iteraciones; i++) {
+            let m3EstaSemana;
+
+            if (i < iteraciones) {
+                // Semanas normales
+                m3EstaSemana = Math.round(m3PorSemanaNormal);
+                m3AcumuladoEnMes += m3EstaSemana;
+            } else {
+                // ÚLTIMA SEMANA DEL MES: Solo lo que sobra para clavar el total mensual
+                m3EstaSemana = Math.max(0, Math.round(m3MesObjetivo - m3AcumuladoEnMes));
+            }
+
+            sumaVerificacionSemanal += m3EstaSemana;
             const numSemana = `S${i}-${m.etiqueta}`;
             labelsSemana.push(numSemana);
-            dataSemana.push(m3Final);
+            dataSemana.push(m3EstaSemana);
 
             cuerpo.innerHTML += `
                 <tr>
                     <td>${m.etiqueta}</td>
                     <td>Semana ${i}</td>
-                    <td class="col-ajustada">${m3Final.toLocaleString('es-ES')} m³/ha</td>
-                    <td style="font-style: italic; color: #64748b;">Ajustar según turno</td>
+                    <td class="col-ajustada">${m3EstaSemana.toLocaleString('es-ES')} m³/ha</td>
+                    <td style="font-style: italic; color: #64748b;">${i === iteraciones ? 'Ajuste de cierre de mes' : 'Turno normal'}</td>
                 </tr>`;
             
             exportDataSemanal.push({
                 "Mes": m.etiqueta,
                 "Semana": i,
-                "Riego m3/ha": m3Final
+                "Riego m3/ha": m3EstaSemana
             });
         }
     });
 
-    // Añadimos fila de total al export de Excel
-    exportDataSemanal.push({ "Mes": "TOTAL", "Semana": "-", "Riego m3/ha": sumaVerificacionSemanal });
-
-    // Mostrar el total en la tabla de la web
-    document.getElementById('totalSemanalSuma').innerText = sumaVerificacionSemanal.toLocaleString('es-ES') + " m³/ha";
-    document.getElementById('seccionSemanal').style.display = "block";
-
-    // Gráfico de tendencia (Línea)
+    // Actualizar UI
+    document.getElementById('totalSemanalSuma').innerText = Math.round(sumaVerificacionSemanal).toLocaleString('es-ES') + " m³/ha";
+    
+    // El gráfico ahora mostrará la realidad: la última semana de cada mes es más corta
     const ctxS = document.getElementById('graficaSemanal').getContext('2d');
     if(miGraficaSemana) miGraficaSemana.destroy();
     miGraficaSemana = new Chart(ctxS, {
@@ -307,12 +318,12 @@ function calcularDesgloseSemanal(mesesCiclo, volTotal, sumaIdealTotal) {
         data: {
             labels: labelsSemana,
             datasets: [{
-                label: `Plan Semanal (Total: ${sumaVerificacionSemanal} m³/ha)`,
+                label: `Plan Semanal (Suma: ${Math.round(sumaVerificacionSemanal)} m³/ha)`,
                 data: dataSemana,
                 borderColor: '#ca8a04',
                 backgroundColor: 'rgba(202, 138, 4, 0.1)',
                 fill: true,
-                tension: 0.4
+                tension: 0.3
             }]
         },
         options: { 
