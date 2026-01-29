@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>S.I.G. Riego Pro - Medalla de Oro Agronómica</title>
+    <title>S.I.G. Riego Pro - Medalla de Oro con Distancia</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -18,6 +18,7 @@
         .btn { padding: 12px 25px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .btn-blue { background: #2563eb; color: white; }
         .btn-gold { background: #ca8a04; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
+        .result-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
         .chart-container { height: 450px; margin: 30px 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; font-size: 0.85em; }
         th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: right; }
@@ -31,13 +32,13 @@
 
 <div class="container">
     <div class="card">
-        <div class="header-step">📍 1. Localización de Estación</div>
+        <div class="header-step">📍 1. Localización de Parcela y Estación</div>
         <div class="input-group">
-            <div><label>Latitud</label><input type="number" id="lat" value="39.44" step="0.01"></div>
-            <div><label>Longitud</label><input type="number" id="lon" value="-0.74" step="0.01"></div>
-            <button class="btn btn-blue" style="align-self: flex-end;" onclick="buscarEstacion()">Buscar Estación</button>
+            <div><label>Latitud (X)</label><input type="number" id="lat" value="39.443557" step="0.000001"></div>
+            <div><label>Longitud (Y)</label><input type="number" id="lon" value="-0.740434" step="0.000001"></div>
+            <button class="btn btn-blue" style="align-self: flex-end;" onclick="encontrarMasCercana()">Buscar Estación</button>
         </div>
-        <div id="infoEstacion" style="display:none; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;"></div>
+        <div id="resBusqueda" class="result-box" style="display:none"></div>
     </div>
 
     <div class="card">
@@ -46,7 +47,7 @@
             <div><label>Cultivo Leñoso</label><select id="selectCultivo"><option>Cargando...</option></select></div>
             <div><label>Inicio Ciclo</label><input type="date" id="cicloIni" value="2026-03-01"></div>
             <div><label>Fin Ciclo</label><input type="date" id="cicloFin" value="2026-10-31"></div>
-            <div><label>Recursos Disponibles (m³/ha)</label><input type="number" id="volDisponible" value="4000" placeholder="Ej: 4000"></div>
+            <div><label>Recursos Disponibles (m³/ha)</label><input type="number" id="volDisponible" value="4000"></div>
         </div>
         
         <label>Carga el JSON de AEMET (3 últimos años):</label><br>
@@ -58,13 +59,11 @@
             <div class="chart-container">
                 <canvas id="graficaDoble"></canvas>
             </div>
-
-            <button class="btn btn-blue" style="width:100%" onclick="descargarExcel()">📥 Descargar Informe de Planificación (.xlsx)</button>
-
+            <button class="btn btn-blue" style="width:100%" onclick="descargarExcel()">📥 Descargar Informe Completo (.xlsx)</button>
             <table>
                 <thead>
                     <tr>
-                        <th>Periodo (Mes/Año)</th>
+                        <th>Periodo</th>
                         <th>Días Activos</th>
                         <th>ETo/Evap (mm)</th>
                         <th>Kc</th>
@@ -92,37 +91,39 @@ let miGrafica = null;
 let exportData = [];
 const fReg = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 
-// Cargar cultivos
 fetch('cultivos.json').then(r => r.json()).then(data => {
     cultivosData = data;
     document.getElementById('selectCultivo').innerHTML = data.map((c, i) => `<option value="${i}">${c.nombre}</option>`).join('');
 });
 
-function buscarEstacion() {
-    fetch('estaciones.json').then(r => r.json()).then(ests => {
-        const uLat = parseFloat(document.getElementById('lat').value);
-        const uLon = parseFloat(document.getElementById('lon').value);
-        let m = null, dMin = Infinity;
-        ests.forEach(e => {
-            const d = Math.sqrt(Math.pow(uLat - parseCoord(e.latitud), 2) + Math.pow(uLon - parseCoord(e.longitud), 2));
-            if(d < dMin) { dMin = d; m = e; }
-        });
-        document.getElementById('infoEstacion').style.display = "block";
-        document.getElementById('infoEstacion').innerHTML = `✅ <b>Estación:</b> ${m.nombre} (Cód: ${m.indicativo})`;
-    });
+// Lógica de localización idéntica al proyecto anterior
+function aemetToDec(coord) {
+    if(!coord) return 0;
+    const dir = coord.slice(-1), n = coord.slice(0, -1);
+    const s = parseFloat(n.slice(-2)), m = parseFloat(n.slice(-4, -2)), g = parseFloat(n.slice(0, n.length - 4));
+    let dec = g + (m/60) + (s/3600);
+    return (dir === 'S' || dir === 'W') ? -dec : dec;
 }
 
-function parseCoord(c) {
-    const d = c.slice(-1), n = c.slice(0,-1);
-    const s = parseFloat(n.slice(-2)), m = parseFloat(n.slice(-4,-2)), g = parseFloat(n.slice(0, n.length-4));
-    const dec = g + (m/60) + (s/3600);
-    return (d === 'S' || d === 'W') ? -dec : dec;
+function encontrarMasCercana() {
+    fetch('estaciones.json').then(r => r.json()).then(ests => {
+        const latU = parseFloat(document.getElementById('lat').value);
+        const lonU = parseFloat(document.getElementById('lon').value);
+        let mejor = null, dMin = Infinity;
+        ests.forEach(e => {
+            const d = Math.sqrt(Math.pow(latU - aemetToDec(e.latitud), 2) + Math.pow(lonU - aemetToDec(e.longitud), 2));
+            if(d < dMin) { dMin = d; mejor = e; }
+        });
+        const res = document.getElementById('resBusqueda');
+        res.style.display = "block";
+        res.innerHTML = `<strong>✅ Estación:</strong> ${mejor.nombre} | <strong>Cód:</strong> <span style="color:#e11d48; font-weight:bold">${mejor.indicativo}</span> | <strong>Distancia:</strong> ${(dMin*111).toLocaleString('es-ES', fReg)} km`;
+    });
 }
 
 function generarPlanOro() {
     const file = document.getElementById('jsonFile').files[0];
     const volV = parseFloat(document.getElementById('volDisponible').value) || 0;
-    if(!file) return alert("Sube el JSON");
+    if(!file) return alert("Sube el JSON de AEMET");
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -131,16 +132,15 @@ function generarPlanOro() {
         const fIni = new Date(document.getElementById('cicloIni').value);
         const fFin = new Date(document.getElementById('cicloFin').value);
 
-        // 1. Medias históricas
         const mediasETo = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
         aemet.forEach(d => {
             const m = parseInt(d.fecha.split('-')[1]);
             if(m === 13) return;
+            // Soporta eto_mes, evap_mes o la variable "e" de tu estación
             let val = parseFloat(String(d.eto_mes || d.evap_mes || d.e || "0").replace(',','.'));
             if(val > 0) { mediasETo[m].sum += val; mediasETo[m].count++; }
         });
 
-        // 2. Cálculo de Necesidad Ideal
         let mesesCiclo = [];
         let sumaIdealM3 = 0;
         let iter = new Date(fIni.getFullYear(), fIni.getMonth(), 1);
@@ -157,23 +157,14 @@ function generarPlanOro() {
                 const etoMedia = mediasETo[mIdx+1].count > 0 ? (mediasETo[mIdx+1].sum / mediasETo[mIdx+1].count) : 0;
                 const etoProrrata = (etoMedia / diasMes) * nDias;
                 const kc = cultivo.kc[mIdx+1] || 0;
-                const etcIdeal = etoProrrata * kc;
-                const m3Ideal = etcIdeal * 10;
+                const m3Ideal = etoProrrata * kc * 10;
                 sumaIdealM3 += m3Ideal;
 
-                mesesCiclo.push({ 
-                    etiqueta: `${mIdx+1}/${anio}`, 
-                    dias: Math.round(nDias), 
-                    diasTotales: diasMes,
-                    eto: etoProrrata, 
-                    kc: kc, 
-                    m3Ideal: m3Ideal 
-                });
+                mesesCiclo.push({ etiqueta: `${mIdx+1}/${anio}`, dias: Math.round(nDias), diasTot: diasMes, eto: etoProrrata, kc: kc, m3Ideal: m3Ideal });
             }
             iter.setMonth(iter.getMonth() + 1);
         }
 
-        // 3. Prorrateo del Volumen Disponible (V)
         const cuerpo = document.getElementById('cuerpoTabla');
         cuerpo.innerHTML = "";
         exportData = [];
@@ -181,10 +172,8 @@ function generarPlanOro() {
         const labels = []; const dataIdeal = []; const dataAjustada = [];
 
         mesesCiclo.forEach(m => {
-            // Fórmula: (m3Ideal / sumaTotalIdeal) * volV
             const m3Ajustado = sumaIdealM3 > 0 ? (m.m3Ideal / sumaIdealM3) * volV : 0;
             sumaAjustadoM3 += m3Ajustado;
-
             labels.push(m.etiqueta);
             dataIdeal.push(Math.round(m.m3Ideal));
             dataAjustada.push(Math.round(m3Ajustado));
@@ -192,24 +181,20 @@ function generarPlanOro() {
             cuerpo.innerHTML += `
                 <tr>
                     <td>${m.etiqueta}</td>
-                    <td>${m.dias} de ${m.diasTotales}</td>
+                    <td>${m.dias} de ${m.diasTot}</td>
                     <td>${m.eto.toLocaleString('es-ES', fReg)}</td>
-                    <td>${m.kc.toFixed(2)}</td>
+                    <td>${m.kc === 0 ? '0,0 (D)' : m.kc.toFixed(2)}</td>
                     <td class="col-ideal">${Math.round(m.m3Ideal).toLocaleString('es-ES')} m³/ha</td>
                     <td class="col-ajustada">${Math.round(m3Ajustado).toLocaleString('es-ES')} m³/ha</td>
                 </tr>`;
             
-            exportData.push({
-                "Mes": m.etiqueta, "Días": m.dias, "ETo mm": m.eto.toFixed(1), "Kc": m.kc, 
-                "Ideal m3/ha": Math.round(m.m3Ideal), "Ajustado m3/ha": Math.round(m3Ajustado)
-            });
+            exportData.push({ "Mes": m.etiqueta, "Días": m.dias, "ETo mm": m.eto.toFixed(1), "Kc": m.kc, "Ideal m3/ha": Math.round(m.m3Ideal), "Ajustado m3/ha": Math.round(m3Ajustado) });
         });
 
         document.getElementById('totalIdeal').innerText = Math.round(sumaIdealM3).toLocaleString('es-ES') + " m³/ha";
         document.getElementById('totalAjustado').innerText = Math.round(sumaAjustadoM3).toLocaleString('es-ES') + " m³/ha";
         document.getElementById('panelResultados').style.display = "block";
 
-        // 4. Gráfico Doble
         const ctx = document.getElementById('graficaDoble').getContext('2d');
         if(miGrafica) miGrafica.destroy();
         miGrafica = new Chart(ctx, {
@@ -221,11 +206,9 @@ function generarPlanOro() {
                     { label: 'Riego AJUSTADO (m³/ha)', data: dataAjustada, backgroundColor: '#ca8a04' }
                 ]
             },
-            options: {
+            options: { 
                 responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    datalabels: { anchor: 'end', align: 'top', font: { size: 10, weight: 'bold' } }
-                }
+                plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 10, weight: 'bold' } } }
             }
         });
     };
@@ -236,7 +219,7 @@ function descargarExcel() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "PlanRiego");
-    XLSX.writeFile(wb, "Plan_Riego_Prorrateado.xlsx");
+    XLSX.writeFile(wb, "Informe_Riego_Prorrateado.xlsx");
 }
 </script>
 </body>
