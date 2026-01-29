@@ -176,39 +176,110 @@ function generarPlanOro() {
     };
     reader.readAsText(file);
 }
-
 function calcularDesgloseSemanal(mesesCiclo, volTotal, sumaIdealTotal) {
     const cuerpo = document.getElementById('cuerpoTablaSemanal');
-    cuerpo.innerHTML = ""; exportDataSemanal = [];
-    let labelsS = [], dataS = [], sumaS = 0;
+    cuerpo.innerHTML = "";
+    exportDataSemanal = [];
+    const labelsSemana = [];
+    const dataSemana = [];
+
+    // 1. Crear un mapa de riego diario para todo el ciclo
+    let riegoDiarioMapa = {};
+    const fIni = new Date(document.getElementById('cicloIni').value);
+    const fFin = new Date(document.getElementById('cicloFin').value);
 
     mesesCiclo.forEach(m => {
-        const m3MesObj = sumaIdealTotal > 0 ? (m.m3Ideal / sumaIdealTotal) * volTotal : 0;
-        const numSemanas = Math.ceil(m.dias / 7);
-        let acumuladoMes = 0;
-
-        for(let i = 1; i <= numSemanas; i++) {
-            let m3Sem;
-            if (i < numSemanas) { m3Sem = Math.round((m3MesObj / m.dias) * 7); acumuladoMes += m3Sem; }
-            else { m3Sem = Math.max(0, Math.round(m3MesObj - acumuladoMes)); }
-            
-            sumaS += m3Sem;
-            labelsS.push(`S${i}-${m.etiqueta}`); dataS.push(m3Sem);
-            cuerpo.innerHTML += `<tr><td>${m.etiqueta}</td><td>Semana ${i}</td><td class="col-ajustada">${m3Sem}</td><td>${i === numSemanas ? 'Ajuste' : 'Turno'}</td></tr>`;
-            exportDataSemanal.push({ "Mes": m.etiqueta, "Semana": i, "Riego": m3Sem });
+        const m3MesObjetivo = sumaIdealTotal > 0 ? (m.m3Ideal / sumaIdealTotal) * volTotal : 0;
+        const m3Diario = m3MesObjetivo / m.dias;
+        
+        // Asignar ese valor diario a cada día que compone este mes en el ciclo
+        let d = new Date(fIni); 
+        while(d <= fFin) {
+            let mesClave = `${d.getMonth() + 1}/${d.getFullYear()}`;
+            if(mesClave === m.etiqueta) {
+                let fechaKey = d.toISOString().split('T')[0];
+                riegoDiarioMapa[fechaKey] = m3Diario;
+            }
+            d.setDate(d.getDate() + 1);
         }
     });
 
-    document.getElementById('totalSemanalSuma').innerText = Math.round(sumaS) + " m³/ha";
+    // 2. Agrupar por número de semana del año
+    let agrupacionSemanal = {};
+    let diaActual = new Date(fIni);
+    
+    while (diaActual <= fFin) {
+        const numSemana = getWeekNumber(diaActual);
+        const añoSemana = diaActual.getFullYear();
+        const claveSemana = `Semana ${numSemana} (${añoSemana})`;
+        
+        const fechaISO = diaActual.toISOString().split('T')[0];
+        const valorDia = riegoDiarioMapa[fechaISO] || 0;
+        
+        if (!agrupacionSemanal[claveSemana]) {
+            agrupacionSemanal[claveSemana] = { suma: 0, mesReferencia: nombresMeses[diaActual.getMonth()] };
+        }
+        agrupacionSemanal[claveSemana].suma += valorDia;
+        diaActual.setDate(diaActual.getDate() + 1);
+    }
+
+    // 3. Renderizar Tabla, Gráfico y Excel
+    let sumaTotalVerificacion = 0;
+    for (const [semana, info] of Object.entries(agrupacionSemanal)) {
+        const riegoSemanal = Math.round(info.suma);
+        sumaTotalVerificacion += riegoSemanal;
+        
+        labelsSemana.push(semana);
+        dataSemana.push(riegoSemanal);
+
+        cuerpo.innerHTML += `
+            <tr>
+                <td>${info.mesReferencia}</td>
+                <td>${semana}</td>
+                <td class="col-ajustada">${riegoSemanal.toLocaleString('es-ES')} m³/ha</td>
+                <td style="font-style: italic; color: #64748b;">Turno semanal natural</td>
+            </tr>`;
+        
+        exportDataSemanal.push({ "Mes": info.mesReferencia, "Semana": semana, "Riego m3/ha": riegoSemanal });
+    }
+
+    document.getElementById('totalSemanalSuma').innerText = Math.round(sumaTotalVerificacion).toLocaleString('es-ES') + " m³/ha";
     document.getElementById('seccionSemanal').style.display = "block";
 
+    // 4. Gráfico de Línea Fluida (Sin picos de cierre de mes)
+    const ctxS = document.getElementById('graficaSemanal').getContext('2d');
     if(miGraficaSemana) miGraficaSemana.destroy();
-    miGraficaSemana = new Chart(document.getElementById('graficaSemanal').getContext('2d'), {
+    miGraficaSemana = new Chart(ctxS, {
         type: 'line',
-        data: { labels: labelsS, datasets: [{ label: 'Semanal (m³/ha)', data: dataS, borderColor: '#ca8a04', fill: true, tension: 0.3 }] },
-        options: { responsive: true, maintainAspectRatio: false }
+        data: {
+            labels: labelsSemana,
+            datasets: [{
+                label: 'Riego por Semana Natural (m³/ha)',
+                data: dataSemana,
+                borderColor: '#ca8a04',
+                backgroundColor: 'rgba(202, 138, 4, 0.1)',
+                fill: true,
+                tension: 0.4, // Curva suave
+                pointRadius: 3
+            }]
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { datalabels: { display: false } }
+        }
     });
 }
+
+// Función auxiliar para obtener el número de semana ISO
+function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return weekNo;
+}
+
 
 function descargarExcel() {
     const ws = XLSX.utils.json_to_sheet(exportDataMensual);
