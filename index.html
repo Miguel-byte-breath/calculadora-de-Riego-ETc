@@ -2,84 +2,82 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Calculadora Riego ETc - Gestión Hídrica Pro</title>
+    <title>S.I.G. Riego Pro - Medalla de Oro Agronómica</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f1f5f9; color: #1e293b; }
         .container { max-width: 1200px; margin: auto; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .header-step { border-left: 5px solid #2563eb; padding-left: 15px; margin-bottom: 20px; color: #1e3a8a; font-weight: bold; font-size: 1.2em; }
         .input-group { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
-        input, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; }
-        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .input-group div { display: flex; flex-direction: column; gap: 5px; }
+        input, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; font-size: 0.9em; }
+        label { font-size: 0.85em; font-weight: bold; color: #64748b; }
+        .btn { padding: 12px 25px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .btn-blue { background: #2563eb; color: white; }
-        .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
-        .chart-container { height: 400px; margin: 30px 0; }
+        .btn-gold { background: #ca8a04; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
+        .chart-container { height: 450px; margin: 30px 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; font-size: 0.85em; }
         th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: right; }
         th { background: #f8fafc; color: #1e3a8a; text-align: center; }
-        td:first-child { text-align: left; font-weight: bold; }
-        .highlight { font-weight: bold; color: #166534; background: #dcfce7; }
-        .dormancia { color: #94a3b8; font-style: italic; }
-        .total-row { background: #f1f5f9; font-weight: bold; font-size: 1.1em; }
+        .col-ideal { color: #166534; font-weight: bold; }
+        .col-ajustada { color: #ca8a04; font-weight: bold; background: #fefce8; }
+        .total-row { background: #f1f5f9; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="card">
-        <div class="header-step">📍 1. Localizar Estación AEMET</div>
+        <div class="header-step">📍 1. Localización de Estación</div>
         <div class="input-group">
-            Latitud: <input type="number" id="lat" value="39.44" step="0.01">
-            Longitud: <input type="number" id="lon" value="-0.74" step="0.01">
-            <button class="btn btn-blue" onclick="buscarEstacion()">Buscar Estación Cercana</button>
+            <div><label>Latitud</label><input type="number" id="lat" value="39.44" step="0.01"></div>
+            <div><label>Longitud</label><input type="number" id="lon" value="-0.74" step="0.01"></div>
+            <button class="btn btn-blue" style="align-self: flex-end;" onclick="buscarEstacion()">Buscar Estación</button>
         </div>
-        <div id="infoEstacion" class="card" style="display:none; background:#f8fafc; box-shadow:none; border:1px solid #e2e8f0;"></div>
+        <div id="infoEstacion" style="display:none; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;"></div>
     </div>
 
     <div class="card">
-        <div class="header-step">💧 2. Planificación de Riego (Modelo Predictivo Prorrateado)</div>
+        <div class="header-step">🥇 2. Balance Hídrico: Ideal vs. Recursos Disponibles</div>
         <div class="input-group">
-            Cultivo: <select id="selectCultivo"><option>Cargando cultivos...</option></select>
-            Inicio Ciclo: <input type="date" id="cicloIni" value="2026-03-15">
-            Fin Ciclo: <input type="date" id="cicloFin" value="2026-10-20">
+            <div><label>Cultivo Leñoso</label><select id="selectCultivo"><option>Cargando...</option></select></div>
+            <div><label>Inicio Ciclo</label><input type="date" id="cicloIni" value="2026-03-01"></div>
+            <div><label>Fin Ciclo</label><input type="date" id="cicloFin" value="2026-10-31"></div>
+            <div><label>Recursos Disponibles (m³/ha)</label><input type="number" id="volDisponible" value="4000" placeholder="Ej: 4000"></div>
         </div>
-        <p>Sube el archivo JSON de AEMET (basado en el endpoint mensual/anual):</p>
-        <input type="file" id="jsonFile" accept=".json">
         
-        <button class="btn btn-green" onclick="generarPlanRiego()">Generar Estimación de Riego</button>
+        <label>Carga el JSON de AEMET (3 últimos años):</label><br>
+        <input type="file" id="jsonFile" accept=".json" style="margin-top:5px;">
+        
+        <button class="btn btn-gold" onclick="generarPlanOro()">Calcular Medalla de Oro Agronómica</button>
 
         <div id="panelResultados" style="display:none">
-            <div style="text-align: center; margin-top: 20px;">
-                <h3 id="resumenTitulo" style="color: #1e3a8a; margin-bottom: 5px;"></h3>
-                <div id="consumoDestacado" style="background: #dcfce7; color: #166534; display: inline-block; padding: 10px 30px; border-radius: 30px; font-weight: bold; font-size: 1.3em;"></div>
-            </div>
-
             <div class="chart-container">
-                <canvas id="graficaEtc"></canvas>
+                <canvas id="graficaDoble"></canvas>
             </div>
 
-            <button class="btn btn-blue" style="width:100%" onclick="descargarExcel()">📥 Descargar Informe Completo (.xlsx)</button>
+            <button class="btn btn-blue" style="width:100%" onclick="descargarExcel()">📥 Descargar Informe de Planificación (.xlsx)</button>
 
             <table>
                 <thead>
                     <tr>
-                        <th>Mes / Año</th>
-                        <th>Días Prorrateados</th>
-                        <th>ETo/Evap Media (mm)</th>
-                        <th>Kc (Mes)</th>
-                        <th>ETc Prorrateada (mm)</th>
-                        <th>Consumo (m³/ha)</th>
+                        <th>Periodo (Mes/Año)</th>
+                        <th>Días Activos</th>
+                        <th>ETo/Evap (mm)</th>
+                        <th>Kc</th>
+                        <th class="col-ideal">Consumo IDEAL (m³/ha)</th>
+                        <th class="col-ajustada">Riego AJUSTADO (m³/ha)</th>
                     </tr>
                 </thead>
                 <tbody id="cuerpoTabla"></tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td colspan="5" style="text-align:right">TOTAL ESTIMADO DEL CICLO:</td>
-                        <td id="totalFinal" style="text-align:center; color:#16a34a"></td>
+                        <td colspan="4" style="text-align:right">TOTALES DEL CICLO:</td>
+                        <td id="totalIdeal" class="col-ideal" style="text-align:right"></td>
+                        <td id="totalAjustado" class="col-ajustada" style="text-align:right"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -91,17 +89,15 @@
 Chart.register(ChartDataLabels);
 let cultivosData = [];
 let miGrafica = null;
-let dataParaExcel = [];
-const fNum = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+let exportData = [];
+const fReg = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 
-// Cargar tabla de cultivos
+// Cargar cultivos
 fetch('cultivos.json').then(r => r.json()).then(data => {
     cultivosData = data;
     document.getElementById('selectCultivo').innerHTML = data.map((c, i) => `<option value="${i}">${c.nombre}</option>`).join('');
 });
 
-// Lógica de Localización
 function buscarEstacion() {
     fetch('estaciones.json').then(r => r.json()).then(ests => {
         const uLat = parseFloat(document.getElementById('lat').value);
@@ -111,9 +107,8 @@ function buscarEstacion() {
             const d = Math.sqrt(Math.pow(uLat - parseCoord(e.latitud), 2) + Math.pow(uLon - parseCoord(e.longitud), 2));
             if(d < dMin) { dMin = d; m = e; }
         });
-        const res = document.getElementById('infoEstacion');
-        res.style.display = "block";
-        res.innerHTML = `✅ <b>Estación:</b> ${m.nombre} | <b>Indicativo:</b> <span style="color:#dc2626">${m.indicativo}</span><br><small>Usa este código en Postman para bajar los datos necesarios.</small>`;
+        document.getElementById('infoEstacion').style.display = "block";
+        document.getElementById('infoEstacion').innerHTML = `✅ <b>Estación:</b> ${m.nombre} (Cód: ${m.indicativo})`;
     });
 }
 
@@ -124,91 +119,113 @@ function parseCoord(c) {
     return (d === 'S' || d === 'W') ? -dec : dec;
 }
 
-// LÓGICA DE CÁLCULO MAESTRA
-function generarPlanRiego() {
+function generarPlanOro() {
     const file = document.getElementById('jsonFile').files[0];
-    if(!file) return alert("Sube el archivo JSON de AEMET");
+    const volV = parseFloat(document.getElementById('volDisponible').value) || 0;
+    if(!file) return alert("Sube el JSON");
 
     const reader = new FileReader();
     reader.onload = (e) => {
         const aemet = JSON.parse(e.target.result);
         const cultivo = cultivosData[document.getElementById('selectCultivo').value];
-        const fechaInicio = new Date(document.getElementById('cicloIni').value);
-        const fechaFin = new Date(document.getElementById('cicloFin').value);
+        const fIni = new Date(document.getElementById('cicloIni').value);
+        const fFin = new Date(document.getElementById('cicloFin').value);
 
-        // 1. Calcular Medias Mensuales (eto_mes > evap_mes > e)
+        // 1. Medias históricas
         const mediasETo = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
         aemet.forEach(d => {
-            const mNum = parseInt(d.fecha.split('-')[1]);
-            if(mNum === 13) return;
-            // Prioridad de variables según disponibilidad en el JSON
-            let valorEto = d.eto_mes || d.evap_mes || d.e;
-            if(valorEto) {
-                mediasETo[mNum].sum += parseFloat(String(valorEto).replace(',', '.'));
-                mediasETo[mNum].count++;
-            }
+            const m = parseInt(d.fecha.split('-')[1]);
+            if(m === 13) return;
+            let val = parseFloat(String(d.eto_mes || d.evap_mes || d.e || "0").replace(',','.'));
+            if(val > 0) { mediasETo[m].sum += val; mediasETo[m].count++; }
         });
 
-        // 2. Generar meses del ciclo y aplicar prorrateo diario
-        const cuerpo = document.getElementById('cuerpoTabla');
-        cuerpo.innerHTML = "";
-        dataParaExcel = [];
-        let totalCicloM3 = 0;
-        const labelsGraf = []; const valuesGraf = [];
+        // 2. Cálculo de Necesidad Ideal
+        let mesesCiclo = [];
+        let sumaIdealM3 = 0;
+        let iter = new Date(fIni.getFullYear(), fIni.getMonth(), 1);
+        
+        while (iter <= fFin) {
+            const anio = iter.getFullYear();
+            const mIdx = iter.getMonth();
+            const diasMes = new Date(anio, mIdx + 1, 0).getDate();
+            const rIni = new Date(Math.max(iter, fIni));
+            const rFin = new Date(Math.min(new Date(anio, mIdx, diasMes), fFin));
+            const nDias = Math.max(0, (rFin - rIni) / (1000 * 60 * 60 * 24) + 1);
 
-        let iterador = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth(), 1);
-        while (iterador <= fechaFin) {
-            const anio = iterador.getFullYear();
-            const mesIdx = iterador.getMonth();
-            const diasMes = new Date(anio, mesIdx + 1, 0).getDate();
-            
-            const rIni = new Date(Math.max(iterador, fechaInicio));
-            const rFin = new Date(Math.min(new Date(anio, mesIdx, diasMes), fechaFin));
-            const diasActivos = Math.max(0, (rFin - rIni) / (1000 * 60 * 60 * 24) + 1);
+            if (nDias > 0) {
+                const etoMedia = mediasETo[mIdx+1].count > 0 ? (mediasETo[mIdx+1].sum / mediasETo[mIdx+1].count) : 0;
+                const etoProrrata = (etoMedia / diasMes) * nDias;
+                const kc = cultivo.kc[mIdx+1] || 0;
+                const etcIdeal = etoProrrata * kc;
+                const m3Ideal = etcIdeal * 10;
+                sumaIdealM3 += m3Ideal;
 
-            if (diasActivos > 0) {
-                const etoMediaMensual = mediasETo[mesIdx + 1].count > 0 ? (mediasETo[mesIdx + 1].sum / mediasETo[mesIdx + 1].count) : 0;
-                
-                // Prorrateo: (Media mensual / días totales del mes) * días de cultivo en ese mes
-                const etoProrrateada = (etoMediaMensual / diasMes) * diasActivos;
-                const kc = cultivo.kc[mesIdx + 1] || 0;
-                const etc = etoProrrateada * kc;
-                const m3ha = etc * 10;
-                totalCicloM3 += m3ha;
-
-                const labelMes = `${nombresMeses[mesIdx]} ${anio}`;
-                labelsGraf.push(labelMes);
-                valuesGraf.push(etc);
-
-                cuerpo.innerHTML += `
-                    <tr class="${kc === 0 ? 'dormancia' : ''}">
-                        <td>${labelMes}</td>
-                        <td>${Math.round(diasActivos)} / ${diasMes} días</td>
-                        <td>${etoProrrateada.toLocaleString('es-ES', fNum)}</td>
-                        <td>${kc === 0 ? '0,0 (D)' : kc.toFixed(2)}</td>
-                        <td class="${kc > 0 ? 'highlight' : ''}">${etc.toLocaleString('es-ES', fNum)} mm</td>
-                        <td class="${kc > 0 ? 'highlight' : ''}">${Math.round(m3ha).toLocaleString('es-ES')} m³/ha</td>
-                    </tr>`;
-                
-                dataParaExcel.push({ "Mes": labelMes, "Días Activos": Math.round(diasActivos), "ETo Prorr. (mm)": etoProrrateada.toFixed(1), "Kc": kc.toFixed(2), "ETc (mm)": etc.toFixed(1), "Riego (m3/ha)": Math.round(m3ha) });
+                mesesCiclo.push({ 
+                    etiqueta: `${mIdx+1}/${anio}`, 
+                    dias: Math.round(nDias), 
+                    diasTotales: diasMes,
+                    eto: etoProrrata, 
+                    kc: kc, 
+                    m3Ideal: m3Ideal 
+                });
             }
-            iterador.setMonth(iterador.getMonth() + 1);
+            iter.setMonth(iter.getMonth() + 1);
         }
 
-        // 3. UI y Gráfica
-        document.getElementById('totalFinal').innerText = `${Math.round(totalCicloM3).toLocaleString('es-ES')} m³/ha`;
-        document.getElementById('consumoDestacado').innerText = `Consumo Total: ${Math.round(totalCicloM3).toLocaleString('es-ES')} m³/ha`;
-        document.getElementById('resumenTitulo').innerText = `Estimación de Riego: ${cultivo.nombre}`;
+        // 3. Prorrateo del Volumen Disponible (V)
+        const cuerpo = document.getElementById('cuerpoTabla');
+        cuerpo.innerHTML = "";
+        exportData = [];
+        let sumaAjustadoM3 = 0;
+        const labels = []; const dataIdeal = []; const dataAjustada = [];
+
+        mesesCiclo.forEach(m => {
+            // Fórmula: (m3Ideal / sumaTotalIdeal) * volV
+            const m3Ajustado = sumaIdealM3 > 0 ? (m.m3Ideal / sumaIdealM3) * volV : 0;
+            sumaAjustadoM3 += m3Ajustado;
+
+            labels.push(m.etiqueta);
+            dataIdeal.push(Math.round(m.m3Ideal));
+            dataAjustada.push(Math.round(m3Ajustado));
+
+            cuerpo.innerHTML += `
+                <tr>
+                    <td>${m.etiqueta}</td>
+                    <td>${m.dias} de ${m.diasTotales}</td>
+                    <td>${m.eto.toLocaleString('es-ES', fReg)}</td>
+                    <td>${m.kc.toFixed(2)}</td>
+                    <td class="col-ideal">${Math.round(m.m3Ideal).toLocaleString('es-ES')} m³/ha</td>
+                    <td class="col-ajustada">${Math.round(m3Ajustado).toLocaleString('es-ES')} m³/ha</td>
+                </tr>`;
+            
+            exportData.push({
+                "Mes": m.etiqueta, "Días": m.dias, "ETo mm": m.eto.toFixed(1), "Kc": m.kc, 
+                "Ideal m3/ha": Math.round(m.m3Ideal), "Ajustado m3/ha": Math.round(m3Ajustado)
+            });
+        });
+
+        document.getElementById('totalIdeal').innerText = Math.round(sumaIdealM3).toLocaleString('es-ES') + " m³/ha";
+        document.getElementById('totalAjustado').innerText = Math.round(sumaAjustadoM3).toLocaleString('es-ES') + " m³/ha";
         document.getElementById('panelResultados').style.display = "block";
 
-        const ctx = document.getElementById('graficaEtc').getContext('2d');
+        // 4. Gráfico Doble
+        const ctx = document.getElementById('graficaDoble').getContext('2d');
         if(miGrafica) miGrafica.destroy();
         miGrafica = new Chart(ctx, {
             type: 'bar',
-            data: { labels: labelsGraf, datasets: [{ label: 'ETc (mm)', data: valuesGraf, backgroundColor: '#16a34a' }] },
-            options: { 
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Consumo IDEAL (m³/ha)', data: dataIdeal, backgroundColor: '#16a34a' },
+                    { label: 'Riego AJUSTADO (m³/ha)', data: dataAjustada, backgroundColor: '#ca8a04' }
+                ]
+            },
+            options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { datalabels: { anchor: 'end', align: 'top', formatter: (v) => v.toLocaleString('es-ES', fNum) + ' mm', font: { weight: 'bold' } } }
+                plugins: {
+                    datalabels: { anchor: 'end', align: 'top', font: { size: 10, weight: 'bold' } }
+                }
             }
         });
     };
@@ -216,10 +233,10 @@ function generarPlanRiego() {
 }
 
 function descargarExcel() {
-    const ws = XLSX.utils.json_to_sheet(dataParaExcel);
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Plan de Riego");
-    XLSX.writeFile(wb, "Informe_Consumo_Riego.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "PlanRiego");
+    XLSX.writeFile(wb, "Plan_Riego_Prorrateado.xlsx");
 }
 </script>
 </body>
