@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>S.I.G. Riego Pro - Balance Hídrico Final</title>
+    <title>S.I.G. Riego Pro - Balance Agronómico Completo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -10,7 +10,7 @@
     <style>
         /* ESTILOS GENERALES */
         body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 20px; background-color: #f8fafc; color: #334155; }
-        .container { max-width: 1350px; margin: auto; }
+        .container { max-width: 1400px; margin: auto; } /* Ancho aumentado para las nuevas columnas */
         .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 25px; border: 1px solid #e2e8f0; }
         
         /* ESTILO SECCIÓN 1 */
@@ -42,9 +42,11 @@
         /* Tablas */
         .chart-container { height: 420px; margin: 25px 0; position: relative; }
         table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 20px; font-size: 0.85rem; }
-        th { background: #f1f5f9; padding: 10px; text-align: center; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
-        td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+        th { background: #f1f5f9; padding: 10px; text-align: center; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; white-space: nowrap; vertical-align: middle; }
+        td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: middle; }
         
+        /* Colores de Columnas */
+        .col-climate { color: #475569; background-color: #f8fafc; } /* Gris muy claro para datos base */
         .col-rain { background-color: #f0f9ff; color: #0284c7; font-weight: 600; }
         .col-ideal { color: #15803d; font-weight: 700; background: #f0fdf4; border-left: 2px solid #bbf7d0; }
         .col-ajustada { color: #b45309; font-weight: 700; background: #fffbeb; }
@@ -81,26 +83,28 @@
             <input type="file" id="jsonFile" accept=".json">
         </div>
 
-        <button class="btn btn-gold" onclick="generarPlanOro()">Calcular Necesidad Neta de Riego</button>
+        <button class="btn btn-gold" onclick="generarPlanOro()">Calcular Balance Completo</button>
 
         <div id="panelResultados" style="display:none">
             <div class="chart-container"><canvas id="graficaDoble"></canvas></div>
-            <button class="btn btn-blue" style="width:100%" onclick="descargarExcel()">📥 Exportar Balance Mensual (.xlsx)</button>
+            <button class="btn btn-blue" style="width:100%" onclick="descargarExcel()">📥 Exportar Tabla Detallada (.xlsx)</button>
             <table>
                 <thead>
                     <tr>
                         <th>Mes</th>
                         <th>Días</th>
-                        <th>ET<sub>c</sub> (mm)</th>
-                        <th class="col-rain">P (mm)</th>
-                        <th class="col-rain">P<sub>e</sub> (mm)</th>
-                        <th class="col-ideal">NH<sub>n</sub> (m³/ha)</th>
-                        <th class="col-ajustada">Asignado (m³/ha)</th>
+                        <th class="col-climate">ET<sub>o</sub><br><small>(mm/d)</small></th>
+                        <th class="col-climate">K<sub>c</sub></th>
+                        <th>ET<sub>c</sub><br><small>(mm)</small></th>
+                        <th class="col-rain">P<br><small>(mm)</small></th>
+                        <th class="col-rain">P<sub>e</sub><br><small>(mm)</small></th>
+                        <th class="col-ideal">NH<sub>n</sub><br><small>(m³/ha)</small></th>
+                        <th class="col-ajustada">Asignado<br><small>(m³/ha)</small></th>
                     </tr>
                 </thead>
                 <tbody id="cuerpoTabla"></tbody>
                 <tfoot class="total-row">
-                    <tr><td colspan="5" style="text-align:right">BALANCE NETO:</td><td id="totalIdeal"></td><td id="totalAjustado"></td></tr>
+                    <tr><td colspan="7" style="text-align:right">TOTAL CAMPAÑA:</td><td id="totalIdeal"></td><td id="totalAjustado"></td></tr>
                 </tfoot>
             </table>
         </div>
@@ -194,7 +198,7 @@ function generarPlanOro() {
             const fIni = new Date(document.getElementById('cicloIni').value);
             const fFin = new Date(document.getElementById('cicloFin').value);
 
-            // 1. Calcular Medias Históricas
+            // 1. Medias Históricas
             const medias = Array(13).fill(0).map(() => ({ sumEto: 0, sumP: 0, count: 0 }));
             
             aemet.forEach(d => {
@@ -236,11 +240,9 @@ function generarPlanOro() {
                     }
                     if (peMensualTotal < 0) peMensualTotal = 0;
 
-                    // Prorrateo días activos
                     const peDiaria = peMensualTotal / diasMesTotal;
                     const peActiva = peDiaria * nDiasActivos;
 
-                    // Balance Neto
                     const nrn_mm = Math.max(0, etcMesTotal - peActiva);
                     const nhn_m3 = nrn_mm * 10;
 
@@ -251,6 +253,11 @@ function generarPlanOro() {
                         mesNum: mIdx+1, 
                         anio: anio, 
                         diasActivos: nDiasActivos,
+                        
+                        // Nuevos Datos Agronómicos
+                        etoDiaria: etoDiaria,
+                        kc: kc,
+                        
                         etcMm: etcMesTotal,
                         pMm: pMensualAvg,
                         peMm: peActiva,
@@ -272,9 +279,6 @@ function generarPlanOro() {
                 m.m3AsignadoFinal = m3Asignado;
 
                 labels.push(m.etiqueta);
-                
-                // --- AJUSTE VISUAL GRÁFICO (EVITAR BARRAS GIGANTES) ---
-                // Convertimos mm a m3/ha (x10)
                 let volPe = Math.round(m.peMm * 10); 
                 dataPe.push(volPe); 
 
@@ -285,6 +289,8 @@ function generarPlanOro() {
                     <tr>
                         <td><b>${m.etiqueta}</b></td>
                         <td>${fmtNum(m.diasActivos)}</td>
+                        <td class="col-climate">${fmtNum(m.etoDiaria, 2)}</td>
+                        <td class="col-climate">${fmtNum(m.kc, 2)}</td>
                         <td>${fmtNum(m.etcMm, 1)}</td>
                         <td class="col-rain">${fmtNum(m.pMm, 1)}</td>
                         <td class="col-rain" style="font-weight:bold">${fmtNum(m.peMm, 1)}</td>
@@ -294,6 +300,9 @@ function generarPlanOro() {
                     
                 exportDataMensual.push({ 
                     "Mes": m.etiqueta, 
+                    "ETo (mm/d)": fmtNum(m.etoDiaria, 2), // Nuevo en Excel
+                    "Kc": fmtNum(m.kc, 2),                // Nuevo en Excel
+                    "ETc (mm)": fmtNum(m.etcMm, 2),
                     "Precipitación (mm)": fmtNum(m.pMm, 2),
                     "P. Efectiva (mm)": fmtNum(m.peMm, 2),
                     "Nec. Neta (m3/ha)": Math.round(m.nhn_m3), 
@@ -325,7 +334,7 @@ function generarPlanOro() {
                                 label: function(context) {
                                     let label = context.dataset.label || '';
                                     let value = context.parsed.y;
-                                    if(context.datasetIndex === 0) { // Barra Azul
+                                    if(context.datasetIndex === 0) { 
                                         return `${label}: ${value} (≈ ${fmtNum(value/10, 1)} mm)`;
                                     }
                                     return `${label}: ${value}`;
