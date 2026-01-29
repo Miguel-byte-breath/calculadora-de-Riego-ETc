@@ -11,6 +11,9 @@ Una herramienta web avanzada de ingeniería agronómica diseñada para el cálcu
 ### 📍 1. Geolocalización y Climatología
 * **Búsqueda Geoespacial:** Algoritmo que identifica automáticamente la estación meteorológica (AEMET) más cercana a las coordenadas exactas de la parcela (Lat/Lon).
 * **Procesamiento de Datos:** Ingesta de archivos JSON (formato **AEMET OpenData**) con capacidad de procesar series históricas completas (medias aritméticas de todos los años disponibles) para obtener valores robustos de **ET<sub>0</sub>** (Evapotranspiración de Referencia) y **P** (Precipitación).
+* > **⚠️ Nota Técnica sobre Proyección a Futuro:**
+> Dado que la herramienta permite planificar campañas de cultivo en fechas futuras, el sistema genera un **modelo climático predictivo**.
+> Para ello, calcula la **media aritmética mensual** de los datos presentes en el archivo JSON (utilizando la serie histórica disponible, típicamente los últimos 3 años). De esta forma, se proyecta un comportamiento climático estadísticamente representativo para los meses venideros, suavizando las anomalías puntuales de un año específico.
 
 ### 🥇 2. Balance Hídrico Mensual (Agronómico)
 El núcleo del sistema se basa en la metodología del **Riego Neto**:
