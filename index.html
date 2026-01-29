@@ -2,8 +2,11 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Calculadora Riego ETc - Prorrateo por Días</title>
+    <title>Calculadora Riego ETc - Informe Profesional</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f1f5f9; color: #1e293b; }
         .container { max-width: 1200px; margin: auto; }
@@ -14,6 +17,7 @@
         .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
         .btn-blue { background: #2563eb; color: white; }
         .btn-green { background: #16a34a; color: white; width: 100%; margin-top: 15px; font-size: 1.1em; }
+        .chart-container { height: 400px; margin: 30px 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; font-size: 0.85em; }
         th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: right; }
         th { background: #f8fafc; color: #1e3a8a; text-align: center; }
@@ -27,7 +31,7 @@
 
 <div class="container">
     <div class="card">
-        <div class="header-step">📍 1. Estación AEMET de Referencia</div>
+        <div class="header-step">📍 1. Localizar Estación AEMET</div>
         <div class="input-group">
             Lat: <input type="number" id="lat" value="39.44" step="0.01">
             Lon: <input type="number" id="lon" value="-0.74" step="0.01">
@@ -37,27 +41,37 @@
     </div>
 
     <div class="card">
-        <div class="header-step">💧 2. Planificación de Riego con Prorrateo Diario</div>
+        <div class="header-step">💧 2. Planificación de Riego (Prorrateo Diario)</div>
         <div class="input-group">
             Cultivo: <select id="selectCultivo"><option>Cargando lista...</option></select>
-            Inicio Ciclo: <input type="date" id="cicloIni" value="2026-03-15">
-            Fin Ciclo: <input type="date" id="cicloFin" value="2026-10-20">
+            Inicio: <input type="date" id="cicloIni" value="2026-03-15">
+            Fin: <input type="date" id="cicloFin" value="2026-10-20">
         </div>
-        <p>Carga el JSON AEMET (3 últimos años) para obtener las medias mensuales:</p>
+        <p>Sube el JSON AEMET (3 años):</p>
         <input type="file" id="jsonFile" accept=".json">
         
-        <button class="btn btn-green" onclick="calcularRiegoProrrateado()">Generar Estimación con Prorrateo</button>
+        <button class="btn btn-green" onclick="generarInforme()">Generar Informe y Gráfica</button>
 
         <div id="panelResultados" style="display:none">
-            <h3 id="resumenTitulo" style="color: #1e3a8a; margin-top: 25px;"></h3>
+            <div style="text-align: center; margin-top: 20px;">
+                <h3 id="resumenTitulo" style="color: #1e3a8a; margin-bottom: 5px;"></h3>
+                <div id="subtituloAnual" style="background: #dcfce7; color: #166534; display: inline-block; padding: 5px 20px; border-radius: 20px; font-weight: bold;"></div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="graficaEtc"></canvas>
+            </div>
+
+            <button class="btn btn-blue" style="width:100%" onclick="descargarExcel()">📥 Descargar Plan de Riego en Excel</button>
+
             <table>
                 <thead>
                     <tr>
                         <th>Mes / Año</th>
-                        <th>Días en Ciclo</th>
-                        <th>ETo Prorrateada (mm)</th>
+                        <th>Días Activos</th>
+                        <th>ETo Media (mm)</th>
                         <th>Kc (Mes)</th>
-                        <th>ETc (mm)</th>
+                        <th>ETc Prorrateada (mm)</th>
                         <th>Consumo (m³/ha)</th>
                     </tr>
                 </thead>
@@ -74,7 +88,10 @@
 </div>
 
 <script>
+Chart.register(ChartDataLabels);
 let listaCultivos = [];
+let miGrafica = null;
+let exportData = [];
 const formatReg = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -92,20 +109,18 @@ function buscarEstacion() {
             const d = Math.sqrt(Math.pow(uLat - parseCoord(e.latitud), 2) + Math.pow(uLon - parseCoord(e.longitud), 2));
             if(d < dMin) { dMin = d; m = e; }
         });
-        const res = document.getElementById('infoEstacion');
-        res.style.display = "block";
-        res.innerHTML = `✅ <strong>Estación:</strong> ${m.nombre} | <strong>Cód:</strong> <span style="font-weight:bold; color:red">${m.indicativo}</span>`;
+        document.getElementById('infoEstacion').style.display = "block";
+        document.getElementById('infoEstacion').innerHTML = `✅ <strong>Estación:</strong> ${m.nombre} | <strong>Cód:</strong> <span style="color:red; font-weight:bold">${m.indicativo}</span>`;
     });
 }
 
 function parseCoord(c) {
     const d = c.slice(-1), n = c.slice(0,-1);
     const s = parseFloat(n.slice(-2)), m = parseFloat(n.slice(-4,-2)), g = parseFloat(n.slice(0, n.length-4));
-    const dec = g + (m/60) + (s/3600);
-    return (d === 'S' || d === 'W') ? -dec : dec;
+    return (d === 'S' || d === 'W') ? -(g + (m/60) + (s/3600)) : (g + (m/60) + (s/3600));
 }
 
-function calcularRiegoProrrateado() {
+function generarInforme() {
     const file = document.getElementById('jsonFile').files[0];
     if(!file) return alert("Sube el JSON de AEMET");
 
@@ -116,67 +131,88 @@ function calcularRiegoProrrateado() {
         const fechaInicio = new Date(document.getElementById('cicloIni').value);
         const fechaFin = new Date(document.getElementById('cicloFin').value);
 
-        // 1. Calcular Medias Históricas Mensuales de ETo
         const mediasETo = Array(13).fill(0).map(() => ({ sum: 0, count: 0 }));
         aemet.forEach(d => {
             const m = parseInt(d.fecha.split('-')[1]);
-            if(m === 13) return;
-            mediasETo[m].sum += parseFloat(String(d.eto_mes || d.evap_mes || "0").replace(',','.'));
-            mediasETo[m].count++;
+            if(m !== 13) {
+                mediasETo[m].sum += parseFloat(String(d.eto_mes || d.evap_mes || "0").replace(',','.'));
+                mediasETo[m].count++;
+            }
         });
 
         const cuerpo = document.getElementById('cuerpoTabla');
         cuerpo.innerHTML = "";
+        exportData = [];
         let totalCicloM3 = 0;
+        
+        const labelsGraf = [];
+        const valuesGraf = [];
 
-        // 2. Iterar por meses entre las fechas elegidas
         let current = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth(), 1);
         while (current <= fechaFin) {
             const anio = current.getFullYear();
-            const mesIdx = current.getMonth(); // 0-11
-            const mesNum = mesIdx + 1; // 1-12
+            const mesIdx = current.getMonth();
+            const diasEnMes = new Date(anio, mesIdx + 1, 0).getDate();
             
-            // Días totales del mes actual
-            const diasEnMes = new Date(anio, mesNum, 0).getDate();
-            
-            // Días que caen dentro del ciclo de cultivo
-            const inicioMes = new Date(anio, mesIdx, 1);
-            const finMes = new Date(anio, mesIdx, diasEnMes);
-            
-            const realInicio = inicioMes < fechaInicio ? fechaInicio : inicioMes;
-            const realFin = finMes > fechaFin ? fechaFin : finMes;
-            
-            const diasEnCiclo = Math.max(0, (realFin - realInicio) / (1000 * 60 * 60 * 24) + 1);
+            const realInicio = new Date(Math.max(current, fechaInicio));
+            const realFin = new Date(Math.min(new Date(anio, mesIdx, diasEnMes), fechaFin));
+            const diasActivos = Math.max(0, (realFin - realInicio) / (1000 * 60 * 60 * 24) + 1);
 
-            if (diasEnCiclo > 0) {
-                const etoMensualMedia = mediasETo[mesNum].count > 0 ? (mediasETo[mesNum].sum / mediasETo[mesNum].count) : 0;
-                
-                // LÓGICA DE PRORRATEO
-                const etoProrrateada = (etoMensualMedia / diasEnMes) * diasEnCiclo;
-                const kc = cultivo.kc[mesNum] || 0;
+            if (diasActivos > 0) {
+                const etoMensual = mediasETo[mesIdx + 1].count > 0 ? (mediasETo[mesIdx + 1].sum / mediasETo[mesIdx + 1].count) : 0;
+                const etoProrrateada = (etoMensual / diasEnMes) * diasActivos;
+                const kc = cultivo.kc[mesIdx + 1] || 0;
                 const etc = etoProrrateada * kc;
                 const m3ha = etc * 10;
                 totalCicloM3 += m3ha;
 
+                const mesTxt = `${mesesNombres[mesIdx]} ${anio}`;
+                labelsGraf.push(mesTxt);
+                valuesGraf.push(etc);
+
                 cuerpo.innerHTML += `
                     <tr>
-                        <td>${mesesNombres[mesIdx]} ${anio}</td>
-                        <td>${Math.round(diasEnCiclo)} de ${diasEnMes} días</td>
+                        <td>${mesTxt}</td>
+                        <td>${Math.round(diasActivos)} / ${diasEnMes}</td>
                         <td>${etoProrrateada.toLocaleString('es-ES', formatReg)}</td>
                         <td>${kc === 0 ? '0,0 (D)' : kc.toFixed(2)}</td>
                         <td class="highlight">${etc.toLocaleString('es-ES', formatReg)} mm</td>
                         <td class="highlight">${m3ha.toLocaleString('es-ES', {maximumFractionDigits:0})} m³/ha</td>
                     </tr>
                 `;
+                exportData.push({ "Mes": mesTxt, "Días": Math.round(diasActivos), "ETo (mm)": etoProrrateada.toFixed(1), "Kc": kc.toFixed(2), "ETc (mm)": etc.toFixed(1), "Riego (m3/ha)": Math.round(m3ha) });
             }
             current.setMonth(current.getMonth() + 1);
         }
 
         document.getElementById('totalFinal').innerText = `${totalCicloM3.toLocaleString('es-ES', {maximumFractionDigits:0})} m³/ha`;
-        document.getElementById('resumenTitulo').innerText = `Estimación de Riego: ${cultivo.nombre}`;
+        document.getElementById('resumenTitulo').innerText = `Plan de Riego: ${cultivo.nombre}`;
+        document.getElementById('subtituloAnual').innerText = `Consumo Total Ciclo: ${totalCicloM3.toLocaleString('es-ES', {maximumFractionDigits:0})} m³/ha`;
         document.getElementById('panelResultados').style.display = "block";
+
+        // GRÁFICA
+        const ctx = document.getElementById('graficaEtc').getContext('2d');
+        if(miGrafica) miGrafica.destroy();
+        miGrafica = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: labelsGraf, datasets: [{ label: 'ETc (mm)', data: valuesGraf, backgroundColor: '#16a34a', borderRadius: 5 }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false,
+                plugins: { 
+                    datalabels: { anchor: 'end', align: 'top', formatter: (v) => v.toLocaleString('es-ES', formatReg) + ' mm', font: { weight: 'bold' } } 
+                },
+                scales: { y: { title: { display: true, text: 'Milímetros (mm)' }, suggestedMax: Math.max(...valuesGraf) * 1.2 } }
+            }
+        });
     };
     reader.readAsText(file);
+}
+
+function descargarExcel() {
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Plan de Riego");
+    XLSX.writeFile(wb, "Informe_Riego_ETc.xlsx");
 }
 </script>
 </body>
