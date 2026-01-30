@@ -15,6 +15,11 @@ Una herramienta web avanzada de ingeniería agronómica diseñada para el cálcu
 > Para la búsqueda de estaciones, el sistema implementa una **Aproximación Euclidiana** sobre el plano (Teorema de Pitágoras).
 > $$d = \sqrt{(\Delta lat)^2 + (\Delta lon)^2} \times 111$$
 > Se utiliza el factor de conversión estándar de **111 km/grado**. Esta aproximación plana optimiza el rendimiento computacional en el navegador, ofreciendo una precisión suficiente para discriminación de puntos en distancias cortas/locales (< 100 km) frente a fórmulas geodésicas complejas (Haversine).
+> ### 📐 Base Cartográfica y Geodesia
+* **Sistema de Referencia:** El sistema opera bajo el estándar **EPSG:4258** (ETRS89 en coordenadas geográficas Latitud/Longitud), garantizando la plena compatibilidad con la cartografía oficial española y europea.
+* **Algoritmo de Proximidad:** Para la búsqueda de estaciones de AEMET, se implementa una **Aproximación Euclidiana** sobre el plano:
+  $$d = \sqrt{(\Delta lat)^2 + (\Delta lon)^2} \times 111$$
+* **Racional Técnico:** Se utiliza el factor de conversión de **111 km/grado**. Esta aproximación plana optimiza el rendimiento computacional en el cliente (navegador), ofreciendo una precisión submétrica en el cálculo de distancias locales (< 100 km) frente a fórmulas geodésicas complejas como Haversine, siendo ideal para la discriminación de la estación meteorológica más representativa.
 * > **⚠️ Nota Técnica sobre Proyección a Futuro:**
 > Dado que la herramienta permite planificar campañas de cultivo en fechas futuras, el sistema genera un **modelo climático predictivo**.
 > Para ello, calcula la **media aritmética mensual** de los datos presentes en el archivo JSON (utilizando la serie histórica disponible, típicamente los últimos 3 años). De esta forma, se proyecta un comportamiento climático estadísticamente representativo para los meses venideros, suavizando las anomalías puntuales de un año específico.
