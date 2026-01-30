@@ -14,7 +14,7 @@ Una herramienta web avanzada de ingeniería agronómica diseñada para el cálcu
 * > **⚠️ Nota Técnica sobre Proyección a Futuro:**
 > Dado que la herramienta permite planificar campañas de cultivo en fechas futuras, el sistema genera un **modelo climático predictivo**.
 > Para ello, calcula la **media aritmética mensual** de los datos presentes en el archivo JSON (utilizando la serie histórica disponible, típicamente los últimos 3 años). De esta forma, se proyecta un comportamiento climático estadísticamente representativo para los meses venideros, suavizando las anomalías puntuales de un año específico.
-> **Nota sobre el Algoritmo de Proximidad:**
+* > **Nota sobre el Algoritmo de Proximidad:**
 > Para la búsqueda de estaciones, el sistema implementa una **Aproximación Euclidiana** sobre el plano (Teorema de Pitágoras).
 > $$d = \sqrt{(\Delta lat)^2 + (\Delta lon)^2} \times 111$$
 > Se utiliza el factor de conversión estándar de **111 km/grado**. Esta aproximación plana optimiza el rendimiento computacional en el navegador, ofreciendo una precisión suficiente para discriminación de puntos en distancias cortas/locales (< 100 km) frente a fórmulas geodésicas complejas (Haversine).
